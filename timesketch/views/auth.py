@@ -1,3 +1,4 @@
+timesketch/views/auth.py
 # Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,8 +52,17 @@ from timesketch.models import db_session
 from timesketch.models.user import Group
 from timesketch.models.user import User
 
+from flask import current_app, redirect, url_for
+from timesketch.views.generic_oauth import setup_oauth, oauth
+
 # Register flask blueprint
 auth_views = Blueprint("user_views", __name__)
+oauth_provider = None
+
+@auth_views.record_once
+def on_load(state):
+    global oauth_provider
+    oauth_provider = setup_oauth(state.app)
 
 TOKEN_URI = "https://www.googleapis.com/oauth2/v3/tokeninfo"
 SCOPES = [
@@ -79,6 +89,10 @@ def login():
         Redirect if authentication is successful or template with context
         otherwise.
     """
+    #Generic Oauth
+    if current_app.config.get('OAUTH_ENABLED', False):
+        redirect_uri = url_for('user_views.oauth2callback', _external=True, _scheme='https')
+        return oauth_provider.authorize_redirect(redirect_uri)
     # Google OpenID Connect authentication.
     if current_app.config.get("GOOGLE_OIDC_ENABLED", False):
         hosted_domain = current_app.config.get("GOOGLE_OIDC_HOSTED_DOMAIN")
@@ -167,6 +181,27 @@ def login():
 
     return render_template("login.html", form=form)
 
+@auth_views.route('/auth/oauth2callback')
+def oauth2callback():
+    try:
+        token = oauth_provider.authorize_access_token()
+        userinfo_endpoint = current_app.config['OAUTH_USERINFO_ENDPOINT']
+        resp = oauth_provider.get(userinfo_endpoint)
+        if resp.status_code != 200:
+            current_app.logger.error(f"Failed to fetch user info. Status code: {resp.status_code}, Response: {resp.text}")
+            return 'Failed to fetch user information', 400
+        
+        user_info = resp.json()
+        email = user_info.get('email')
+        if email:
+            user = User.get_or_create(username=email, name=email)
+            login_user(user)
+            # Redirect to the main sketch list page or another appropriate landing page
+            return redirect(url_for('spa_views.overview'))
+        return 'Failed to fetch user information', 400
+    except Exception as e:
+        current_app.logger.error(f"Error in oauth2callback: {str(e)}")
+        return 'An error occurred during authentication', 500
 
 @auth_views.route("/logout/", methods=["GET"])
 def logout():
