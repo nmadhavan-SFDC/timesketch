@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Entry point for the application."""
+from timesketch.views.generic_oauth import setup_oauth
 
-
-# TODO: Remove once a new plaso release comes out.
 def create_app(config=None):
     """Create the Flask app instance that is used throughout the application.
 
@@ -25,7 +24,6 @@ def create_app(config=None):
     Returns:
         Application object (instance of flask.Flask).
     """
-    # pylint: disable=import-outside-toplevel
     from timesketch import app
-
-    return app.create_app(config)
+    flask_app = app.create_app(config)
+    return flask_app
