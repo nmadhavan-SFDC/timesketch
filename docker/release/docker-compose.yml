@@ -2,7 +2,7 @@ version: "3.7"
 services:
   timesketch-web:
     container_name: timesketch-web
-    image: us-docker.pkg.dev/osdfir-registry/timesketch/timesketch:${TIMESKETCH_VERSION}
+    image: timesketch:local
     environment:
       - NUM_WSGI_WORKERS=${NUM_WSGI_WORKERS}
     restart: always
@@ -16,7 +16,7 @@ services:
   # TODO: Remove when V2 is the default.
   timesketch-web-legacy:
     container_name: timesketch-web-legacy
-    image: us-docker.pkg.dev/osdfir-registry/timesketch/timesketch:${TIMESKETCH_VERSION}
+    image: timesketch:local
     environment:
       - NUM_WSGI_WORKERS=${NUM_WSGI_WORKERS}
     restart: always
@@ -28,7 +28,7 @@ services:
 
   timesketch-worker:
     container_name: timesketch-worker
-    image: us-docker.pkg.dev/osdfir-registry/timesketch/timesketch:${TIMESKETCH_VERSION}
+    image: timesketch:local
     environment:
       - WORKER_LOG_LEVEL=${WORKER_LOG_LEVEL}
     restart: always
@@ -83,4 +83,3 @@ services:
       - ${NGINX_HTTPS_PORT}:443
     volumes:
       - ${NGINX_CONFIG_PATH}:/etc/nginx/nginx.conf
-
