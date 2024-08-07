@@ -75,7 +75,7 @@ OPENSEARCH_PORT=9200
 OPENSEARCH_MEM_USE_GB=$(cat /proc/meminfo | grep MemTotal | awk '{printf "%.0f", ($2 / (1024 * 1024) / 2)}')
 REDIS_ADDRESS="redis"
 REDIS_PORT=6379
-GITHUB_BASE_URL="https://raw.githubusercontent.com/google/timesketch/master"
+GITHUB_BASE_URL="https://raw.githubusercontent.com/nmadhavan-SFDC/timesketch/master"
 echo "OK"
 echo "* Setting OpenSearch memory allocation to ${OPENSEARCH_MEM_USE_GB}GB"
 
