@@ -227,20 +227,6 @@ def logout():
     """
     logout_user()
     return redirect(url_for("user_views.login"))
-
-
-@auth_views.route("/login/local_api/", methods=["POST"])
-def api_login():
-    if not is_local_request():
-        return jsonify({"error": "This endpoint is only available for local requests"}), 403
-    
-    api_key = request.headers.get('X-API-Key')
-    if api_key:
-        user = User.query.filter_by(api_key=api_key).first()
-        if user:
-            login_user(user)
-            return jsonify({"message": "Authenticated successfully"}), 200
-    return jsonify({"error": "Invalid API key"}), 401
     
 @auth_views.route("/login/api_callback/", methods=["GET"])
 def validate_api_token():
@@ -250,8 +236,13 @@ def validate_api_token():
         A simple page indicating the user is authenticated.
     """
     if is_local_request():
-        # For local requests, use a simple API key authentication
-        return api_login()
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(plaintext=password):
+            login_user(user)
+            return jsonify({"message": "Authenticated successfully"}), 200
+        return jsonify({"error": "Invalid credentials"}), 401
         
     ALLOWED_CLIENT_IDS = []
 
