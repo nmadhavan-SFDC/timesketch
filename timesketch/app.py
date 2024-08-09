@@ -21,14 +21,14 @@ import sys
 
 import six
 
-from flask import Flask, request
+from flask import Flask, request, g
 from celery import Celery
 
 from flask_login import LoginManager
 from flask_login import login_required
 from flask_migrate import Migrate
 from flask_restful import Api
-from flask_wtf import CSRFProtect
+from flask_wtf import CSRFProtect, validate_csrf, ValidationError
 
 from timesketch.api.v1.routes import API_ROUTES as V1_API_ROUTES
 from timesketch.lib.errors import ApiHTTPError
@@ -197,14 +197,20 @@ def create_app(config=None, legacy_ui=False):
 
     # Setup CSRF protection for the whole application
     csrf = CSRFProtect(app)
+    
+    @app.before_request
+    def check_if_local():
+        g.is_local_request = request.remote_addr in ['127.0.0.1', 'localhost'] or request.remote_addr.startswith('172.') or request.remote_addr.startswith('10.')
 
     @app.before_request
-    def disable_csrf_on_local_requests():
-        if request.remote_addr in ['127.0.0.1', 'localhost'] or request.remote_addr.startswith('172.') or request.remote_addr.startswith('10.'):
-            csrf._disable = True
-        else:
-            csrf._disable = False
-
+    def disable_csrf_for_local_requests():
+        if not g.is_local_request:
+            try:
+                validate_csrf(request.form.get('csrf_token'))
+            except ValidationError:
+                return "CSRF token is missing or invalid", 400
+    
+    csrf.init_app(app)
     return app
 
 
