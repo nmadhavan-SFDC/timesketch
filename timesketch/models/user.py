@@ -109,8 +109,6 @@ class User(UserMixin, BaseModel):
         if isinstance(password_hash, six.binary_type):
             password_hash = codecs.decode(password_hash, "utf-8")
         self.password = password_hash
-        if not self.api_key:
-            self.api_key = secrets.token_hex(32)
 
     def check_password(self, plaintext):
         """Check a plaintext password against a stored password hash.
