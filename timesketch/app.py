@@ -21,7 +21,7 @@ import sys
 
 import six
 
-from flask import Flask
+from flask import Flask, request
 from celery import Celery
 
 from flask_login import LoginManager
@@ -196,7 +196,14 @@ def create_app(config=None, legacy_ui=False):
         return User.session.get(User, user_id)
 
     # Setup CSRF protection for the whole application
-    CSRFProtect(app)
+    csrf = CSRFProtect(app)
+
+    @app.before_request
+    def disable_csrf_on_local_requests():
+        if request.remote_addr in ['127.0.0.1', 'localhost'] or request.remote_addr.startswith('172.') or request.remote_addr.startswith('10.'):
+            csrf._disable = True
+        else:
+            csrf._disable = False
 
     return app
 
