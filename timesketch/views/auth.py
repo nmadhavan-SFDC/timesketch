@@ -72,7 +72,8 @@ SCOPES = [
 ]
 
 def is_local_request():
-    return request.remote_addr in ['127.0.0.1', 'localhost'] or request.remote_addr.startswith('172.')
+    return request.remote_addr in ['127.0.0.1', 'localhost'] or request.remote_addr.startswith('172.') or
+        request.remote_addr.startswith('10.')
     
 @auth_views.route("/login/", methods=["GET", "POST"])
 def login():
@@ -93,6 +94,8 @@ def login():
     """
 
     # Check if it's a local request
+    current_app.logger.debug(f"Remote addr: {request.remote_addr}")
+    current_app.logger.debug(f"Is local request: {is_local_request()}")
     if is_local_request():
         # Use a simple form-based authentication for local access
         form = UsernamePasswordForm()
@@ -235,6 +238,8 @@ def validate_api_token():
     Returns:
         A simple page indicating the user is authenticated.
     """
+    current_app.logger.debug(f"Remote addr: {request.remote_addr}")
+    current_app.logger.debug(f"Is local request: {is_local_request()}")
     if is_local_request():
         username = request.form.get('username')
         password = request.form.get('password')
