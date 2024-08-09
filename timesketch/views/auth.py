@@ -229,17 +229,17 @@ def logout():
 
 
 @auth_views.route("/login/local_api/", methods=["POST"])
-def local_api_login():
+def api_login():
     if not is_local_request():
         return jsonify({"error": "This endpoint is only available for local requests"}), 403
-
-    username = request.json.get('username')
-    password = request.json.get('password')
-    user = User.query.filter_by(username=username).first()
-    if user and user.check_password(plaintext=password):
-        login_user(user)
-        return jsonify({"message": "Authenticated successfully", "api_key": user.api_key}), 200
-    return jsonify({"error": "Invalid credentials"}), 401
+    
+    api_key = request.headers.get('X-API-Key')
+    if api_key:
+        user = User.query.filter_by(api_key=api_key).first()
+        if user:
+            login_user(user)
+            return jsonify({"message": "Authenticated successfully"}), 200
+    return jsonify({"error": "Invalid API key"}), 401
     
 @auth_views.route("/login/api_callback/", methods=["GET"])
 def validate_api_token():
@@ -250,13 +250,7 @@ def validate_api_token():
     """
     if is_local_request():
         # For local requests, use a simple API key authentication
-        api_key = request.headers.get('X-API-Key')
-        if api_key:
-            user = User.query.filter_by(api_key=api_key).first()
-            if user:
-                login_user(user)
-                return jsonify({"message": "Authenticated successfully"}), 200
-        return jsonify({"error": "Invalid API key"}), 401
+        return api_login()
         
     ALLOWED_CLIENT_IDS = []
 
