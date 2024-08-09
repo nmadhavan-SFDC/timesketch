@@ -16,7 +16,7 @@
 # from __future__ import unicode_literals
 
 import codecs
-import secrets
+
 import six
 
 from flask_bcrypt import generate_password_hash
@@ -56,7 +56,6 @@ class User(UserMixin, BaseModel):
     email = Column(Unicode(255))
     active = Column(Boolean(), default=True)
     admin = Column(Boolean(), default=False)
-    api_key = Column(Unicode(64), unique=True, index=True)
     # Relationships
     profile = relationship("UserProfile", backref="user", lazy="dynamic")
     sketches = relationship("Sketch", backref="user", lazy="dynamic")
@@ -97,7 +96,6 @@ class User(UserMixin, BaseModel):
     def __init__(self, username, name):
         self.username = username
         self.name = name
-        self.api_key = secrets.token_hex(32)  # Generate a random API key
         
     def set_password(self, plaintext, rounds=12):
         """Sets the password for the user. The password hash is created with the
@@ -125,11 +123,6 @@ class User(UserMixin, BaseModel):
             stored password hash.
         """
         return check_password_hash(self.password, plaintext)
-    
-    def regenerate_api_key(self):
-        """Regenerates the API key for the user."""
-        self.api_key = secrets.token_hex(32)
-
 
 class UserProfile(BaseModel):
     """Implements the User profile model."""
