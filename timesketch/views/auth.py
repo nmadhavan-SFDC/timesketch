@@ -72,8 +72,7 @@ SCOPES = [
 ]
 
 def is_local_request():
-    return request.remote_addr in ['127.0.0.1', 'localhost'] or request.remote_addr.startswith('172.') or
-        request.remote_addr.startswith('10.')
+    return request.remote_addr in ['127.0.0.1', 'localhost'] or request.remote_addr.startswith('172.') or request.remote_addr.startswith('10.')
     
 @auth_views.route("/login/", methods=["GET", "POST"])
 def login():
