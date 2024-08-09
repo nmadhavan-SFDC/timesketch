@@ -57,7 +57,7 @@ from timesketch.views.generic_oauth import setup_oauth, oauth
 # Register flask blueprint
 auth_views = Blueprint("user_views", __name__)
 oauth_provider = None
-
+    
 @auth_views.record_once
 def on_load(state):
     global oauth_provider
@@ -70,7 +70,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
 
-
+def is_local_request():
+    return request.remote_addr in ['127.0.0.1', 'localhost'] or request.remote_addr.startswith('172.')
+    
 @auth_views.route("/login/", methods=["GET", "POST"])
 def login():
     """Handler for the login page view.
@@ -88,10 +90,23 @@ def login():
         Redirect if authentication is successful or template with context
         otherwise.
     """
+
+    # Check if it's a local request
+    if is_local_request():
+        # Use a simple form-based authentication for local access
+        form = UsernamePasswordForm()
+        if form.validate_on_submit():
+            user = User.query.filter_by(username=form.username.data).first()
+            if user and user.check_password(plaintext=form.password.data):
+                login_user(user)
+                return redirect(request.args.get("next") or "/")
+        return render_template("login.html", form=form)
+        
     #Generic Oauth
     if current_app.config.get('OAUTH_ENABLED', False):
         redirect_uri = url_for('user_views.oauth2callback', _external=True, _scheme='https')
         return oauth_provider.authorize_redirect(redirect_uri)
+        
     # Google OpenID Connect authentication.
     if current_app.config.get("GOOGLE_OIDC_ENABLED", False):
         hosted_domain = current_app.config.get("GOOGLE_OIDC_HOSTED_DOMAIN")
@@ -213,6 +228,19 @@ def logout():
     return redirect(url_for("user_views.login"))
 
 
+@auth_views.route("/login/local_api/", methods=["POST"])
+def local_api_login():
+    if not is_local_request():
+        return jsonify({"error": "This endpoint is only available for local requests"}), 403
+
+    username = request.json.get('username')
+    password = request.json.get('password')
+    user = User.query.filter_by(username=username).first()
+    if user and user.check_password(plaintext=password):
+        login_user(user)
+        return jsonify({"message": "Authenticated successfully", "api_key": user.api_key}), 200
+    return jsonify({"error": "Invalid credentials"}), 401
+    
 @auth_views.route("/login/api_callback/", methods=["GET"])
 def validate_api_token():
     """Handler for logging in using an authenticated session for the API.
@@ -220,6 +248,16 @@ def validate_api_token():
     Returns:
         A simple page indicating the user is authenticated.
     """
+    if is_local_request():
+        # For local requests, use a simple API key authentication
+        api_key = request.headers.get('X-API-Key')
+        if api_key:
+            user = User.query.filter_by(api_key=api_key).first()
+            if user:
+                login_user(user)
+                return jsonify({"message": "Authenticated successfully"}), 200
+        return jsonify({"error": "Invalid API key"}), 401
+        
     ALLOWED_CLIENT_IDS = []
 
     try:
