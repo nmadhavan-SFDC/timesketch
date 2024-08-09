@@ -28,7 +28,7 @@ from flask_login import LoginManager
 from flask_login import login_required
 from flask_migrate import Migrate
 from flask_restful import Api
-from flask_wtf import CSRFProtect, validate_csrf, ValidationError
+from flask_wtf import CSRFProtect
 
 from timesketch.api.v1.routes import API_ROUTES as V1_API_ROUTES
 from timesketch.lib.errors import ApiHTTPError
