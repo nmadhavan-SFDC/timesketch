@@ -354,6 +354,9 @@ class TimesketchApi:
         self._set_csrf_token(session)
         if auth_mode == "userpass":
             self._authenticate_session(session, username, password)
+            self._set_csrf_token(session)  # Set CSRF token after authentication
+        else:
+            self._set_csrf_token(session)
 
         return session
 
