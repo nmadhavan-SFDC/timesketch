@@ -351,9 +351,11 @@ class TimesketchApi:
             requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
         # Get and set CSRF token and authenticate the session if appropriate.
-        self._set_csrf_token(session)
         if auth_mode == "userpass":
             self._authenticate_session(session, username, password)
+            self._set_csrf_token(session)  # Set CSRF token after authentication
+        else:
+            self._set_csrf_token(session)
 
         return session
 
