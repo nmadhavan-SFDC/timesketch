@@ -107,7 +107,10 @@ def login():
             user = User.query.filter_by(username=form.username.data).first()
             if user and user.check_password(plaintext=form.password.data):
                 login_user(user)
-                return redirect(request.args.get("next") or "/")
+                flash('Logged in successfully')
+                return redirect(url_for('index'))
+            else:
+                flash('Invalid username or password')
         return render_template("login.html", form=form)
         
     #Generic Oauth
