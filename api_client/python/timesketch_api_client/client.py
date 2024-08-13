@@ -42,8 +42,7 @@ from . import version
 from . import sigma
 
 
-#logger = logging.getLogger("timesketch_api.client")
-logger = logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("timesketch_api.client")
 
 
 class TimesketchApi:
@@ -167,12 +166,13 @@ class TimesketchApi:
         session.post("{0:s}/login/".format(self._host_uri), data=data)
 
     def _set_csrf_token(self, session):
-        """Retrieve CSRF token from the server and append to HTTP headers."""
+        """Retrieve CSRF token from the server and append to HTTP headers.
+
+        Args:
+            session: Instance of requests.Session.
+        """
+        # Scrape the CSRF token from the response
         response = session.get(self._host_uri)
-        logging.debug(f"Response status code: {response.status_code}")
-        logging.debug(f"Response headers: {response.headers}")
-        logging.debug(f"Response cookies: {response.cookies}")
-        
         soup = bs4.BeautifulSoup(response.text, features="html.parser")
 
         tag = soup.find(id="csrf_token")
@@ -185,12 +185,9 @@ class TimesketchApi:
                 csrf_token = tag.attrs.get("content")
 
         if not csrf_token:
-            logging.warning("No CSRF token found in the response")
             return
 
-        logging.debug(f"CSRF token: {csrf_token}")
         session.headers.update({"x-csrftoken": csrf_token, "referer": self._host_uri})
-        logging.debug(f"Updated session headers: {session.headers}")
 
     def _create_oauth_session(
         self,
@@ -354,11 +351,9 @@ class TimesketchApi:
             requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
         # Get and set CSRF token and authenticate the session if appropriate.
+        self._set_csrf_token(session)
         if auth_mode == "userpass":
             self._authenticate_session(session, username, password)
-            self._set_csrf_token(session)  # Set CSRF token after authentication
-        else:
-            self._set_csrf_token(session)
 
         return session
 
@@ -443,13 +438,7 @@ class TimesketchApi:
         while True:
             resource_url = "{0:s}/sketches/".format(self.api_root)
             form_data = {"name": name, "description": description}
-            logging.debug(f"Sending POST request to {resource_url}")
-            logging.debug(f"Request headers: {self.session.headers}")
-            logging.debug(f"Request data: {form_data}")
             response = self.session.post(resource_url, json=form_data)
-            logging.debug(f"Response status code: {response.status_code}")
-            logging.debug(f"Response headers: {response.headers}")
-            logging.debug(f"Response content: {response.text}")
             response_dict = error.get_response_json(response, logger)
             objects = response_dict.get("objects")
             if objects:
