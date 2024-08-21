@@ -73,21 +73,21 @@ SCOPES = [
 
 @auth_views.route("/login/", methods=["GET", "POST"])
 def login():
-    """Handler for the login page view.
+"""Handler for the login page view.
 
-    There are four ways of authentication.
-    1) Google OpenID connect.
-    2) Google Cloud Identity-Aware Proxy.
-    3) If Single Sign On (SSO) is enabled in the configuration and the
-       environment variable is present, e.g. REMOTE_USER then the system will
-       get or create the user object and setup a session for the user.
-    4) Local authentication is used if SSO login is not enabled. This will
-       authenticate the user against the local user database
+There are four ways of authentication.
+1) Google OpenID connect.
+2) Google Cloud Identity-Aware Proxy.
+3) If Single Sign On (SSO) is enabled in the configuration and the
+   environment variable is present, e.g. REMOTE_USER then the system will
+   get or create the user object and setup a session for the user.
+4) Local authentication is used if SSO login is not enabled. This will
+   authenticate the user against the local user database
 
-    Returns:
-        Redirect if authentication is successful or template with context
-        otherwise.
-    """
+Returns:
+    Redirect if authentication is successful or template with context
+    otherwise.
+"""
     # Check if it's an API request
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Content-Type') == 'application/json':
         return api_login()
