@@ -38,7 +38,6 @@ from timesketch.models.sketch import SearchIndex
 from timesketch.models.sketch import Sketch
 from timesketch.models.sketch import Timeline
 from timesketch.models.sketch import DataSource
-from timesketch.views.auth import is_local_request
 
 
 logger = logging.getLogger("timesketch.api_upload")
@@ -476,75 +475,6 @@ class UploadFileResource(resources.ResourceMixin, Resource):
             headers_mapping=headers_mapping,
             delimiter=delimiter,
         )
-    
-    def handle_local_upload(self):
-        """Handles local upload requests without requiring authentication."""
-
-        upload_enabled = current_app.config["UPLOAD_ENABLED"]
-        if not upload_enabled:
-            abort(HTTP_STATUS_CODE_BAD_REQUEST, "Upload not enabled")
-
-        form = request.get_data(parse_form_data=True)
-        if not form:
-            form = request.form
-
-        # headers mapping: map between mandatory headers and new ones
-        headers_mapping = json.loads(form.get("headersMapping", "{}")) or None
-        delimiter = form.get("delimiter", ",")
-
-        sketch_id = form.get("sketch_id", None)
-        if not sketch_id:
-            abort(
-                HTTP_STATUS_CODE_BAD_REQUEST,
-                "Unable to upload data without supplying a "
-                "sketch to associate it with.",
-            )
-
-        if not isinstance(sketch_id, int):
-            sketch_id = int(sketch_id)
-
-        sketch = Sketch.get_with_acl(sketch_id)
-        if not sketch:
-            abort(HTTP_STATUS_CODE_NOT_FOUND, "No sketch found with this ID.")
-
-        if sketch.get_status.status == "archived":
-            abort(
-                HTTP_STATUS_CODE_BAD_REQUEST,
-                "Unable to upload a file to an archived sketch.",
-            )
-
-        # Skip the permission check as this is a local request
-
-        utils.update_sketch_last_activity(sketch)
-
-        index_name = form.get("index_name", "")
-        file_storage = request.files.get("file")
-        if file_storage:
-            chunk_index_name = form.get("chunk_index_name", uuid.uuid4().hex)
-            return self._upload_file(
-                file_storage=file_storage,
-                chunk_index_name=chunk_index_name,
-                form=form,
-                sketch=sketch,
-                index_name=index_name,
-                headers_mapping=headers_mapping,
-                delimiter=delimiter,
-            )
-
-        events = form.get("events")
-        if not events:
-            abort(
-                HTTP_STATUS_CODE_BAD_REQUEST,
-                "Unable to upload data, no file uploaded nor any events.",
-            )
-
-        return self._upload_events(
-            events=events,
-            form=form,
-            sketch=sketch,
-            index_name=index_name,
-            headers_mapping=headers_mapping,
-        )
 
     @login_required
     def post(self):
@@ -553,8 +483,6 @@ class UploadFileResource(resources.ResourceMixin, Resource):
         Returns:
             A view in JSON (instance of flask.wrappers.Response)
         """
-        if is_local_request():
-            return self.handle_local_upload()
         upload_enabled = current_app.config["UPLOAD_ENABLED"]
         if not upload_enabled:
             abort(HTTP_STATUS_CODE_BAD_REQUEST, "Upload not enabled")
