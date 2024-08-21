@@ -74,7 +74,7 @@ SCOPES = [
 @auth_views.route("/login/", methods=["GET", "POST"])
 def login():
     """Handler for the login page view.
-    
+
     There are four ways of authentication.
     1) Google OpenID connect.
     2) Google Cloud Identity-Aware Proxy.
@@ -83,35 +83,11 @@ def login():
        get or create the user object and setup a session for the user.
     4) Local authentication is used if SSO login is not enabled. This will
        authenticate the user against the local user database
-    
+
     Returns:
         Redirect if authentication is successful or template with context
         otherwise.
     """
-    # Check if it's an API request
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Content-Type') == 'application/json':
-        return api_login()
-    return web_login()
-
-def api_login():
-    """Handle API authentication."""
-    if request.is_json:
-        data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
-    else:
-        username = request.form.get('username')
-        password = request.form.get('password')
-    
-    user = User.query.filter_by(username=username).first()
-    if user and user.check_password(plaintext=password):
-        login_user(user)
-        return jsonify({"message": "Login successful"}), 200
-    else:
-        return jsonify({"message": "Invalid credentials"}), 401
-
-def web_login():
-    """Handle web authentication."""   
     #Generic Oauth
     if current_app.config.get('OAUTH_ENABLED', False):
         redirect_uri = url_for('user_views.oauth2callback', _external=True, _scheme='https')
