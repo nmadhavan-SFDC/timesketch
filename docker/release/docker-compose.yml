@@ -37,6 +37,18 @@ services:
       - ${TIMESKETCH_CONFIG_PATH}:/etc/timesketch/
       - ${TIMESKETCH_UPLOAD_PATH}:/usr/share/timesketch/upload/
       - ${TIMESKETCH_LOGS_PATH}:/var/log/timesketch/
+  
+  timesketch-api:
+    container_name: timesketch-api
+    image: us-docker.pkg.dev/osdfir-registry/timesketch/timesketch:${TIMESKETCH_VERSION}
+    environment:
+      - NUM_WSGI_WORKERS=${NUM_WSGI_WORKERS}
+    restart: always
+    command: timesketch-web
+    volumes:
+      - ${TIMESKETCH_CONFIG_PATH}:/etc/timesketch/
+      - ${TIMESKETCH_UPLOAD_PATH}:/usr/share/timesketch/upload/
+      - ${TIMESKETCH_LOGS_PATH}:/var/log/timesketch/
 
   opensearch:
     container_name: opensearch
