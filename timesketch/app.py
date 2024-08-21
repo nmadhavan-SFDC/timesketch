@@ -21,7 +21,7 @@ import sys
 
 import six
 
-from flask import Flask, request, g
+from flask import Flask
 from celery import Celery
 
 from flask_login import LoginManager
@@ -196,21 +196,8 @@ def create_app(config=None, legacy_ui=False):
         return User.session.get(User, user_id)
 
     # Setup CSRF protection for the whole application
-    csrf = CSRFProtect(app)
-    
-    @app.before_request
-    def check_if_local():
-        g.is_local_request = request.remote_addr in ['127.0.0.1', 'localhost'] or request.remote_addr.startswith('172.') or request.remote_addr.startswith('10.')
+    CSRFProtect(app)
 
-    @app.before_request
-    def disable_csrf_for_local_requests():
-        if not g.is_local_request:
-            try:
-                validate_csrf(request.form.get('csrf_token'))
-            except ValidationError:
-                return "CSRF token is missing or invalid", 400
-    
-    csrf.init_app(app)
     return app
 
 
