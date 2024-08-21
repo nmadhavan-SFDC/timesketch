@@ -353,6 +353,10 @@ class TimesketchApi:
         # Get and set CSRF token and authenticate the session if appropriate.
         self._set_csrf_token(session)
         if auth_mode == "userpass":
+            session.headers.update({
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        })
             self._authenticate_session(session, username, password)
 
         return session
