@@ -25,7 +25,6 @@ from flask import render_template
 from flask import request
 from flask import session
 from flask import url_for
-from flask import jsonify
 
 from oauthlib import oauth2
 
@@ -58,7 +57,7 @@ from timesketch.views.generic_oauth import setup_oauth, oauth
 # Register flask blueprint
 auth_views = Blueprint("user_views", __name__)
 oauth_provider = None
-    
+
 @auth_views.record_once
 def on_load(state):
     global oauth_provider
@@ -71,14 +70,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
 
-def is_local_request():
-    result = (
-        request.remote_addr in ['127.0.0.1', 'localhost'] or
-        request.remote_addr.startswith('172.') or
-        request.remote_addr.startswith('10.')
-    )
-    print(f"is_local_request: {result} for IP {request.remote_addr}")
-    
+
 @auth_views.route("/login/", methods=["GET", "POST"])
 def login():
     """Handler for the login page view.
@@ -96,28 +88,10 @@ def login():
         Redirect if authentication is successful or template with context
         otherwise.
     """
-
-    # Check if it's a local request
-    current_app.logger.debug(f"Remote addr: {request.remote_addr}")
-    current_app.logger.debug(f"Is local request: {is_local_request()}")
-    if is_local_request():
-        # Use a simple form-based authentication for local access
-        form = UsernamePasswordForm()
-        if form.validate_on_submit():
-            user = User.query.filter_by(username=form.username.data).first()
-            if user and user.check_password(plaintext=form.password.data):
-                login_user(user)
-                flash('Logged in successfully')
-                return redirect(url_for('index'))
-            else:
-                flash('Invalid username or password')
-        return render_template("login.html", form=form)
-        
     #Generic Oauth
     if current_app.config.get('OAUTH_ENABLED', False):
         redirect_uri = url_for('user_views.oauth2callback', _external=True, _scheme='https')
         return oauth_provider.authorize_redirect(redirect_uri)
-        
     # Google OpenID Connect authentication.
     if current_app.config.get("GOOGLE_OIDC_ENABLED", False):
         hosted_domain = current_app.config.get("GOOGLE_OIDC_HOSTED_DOMAIN")
@@ -237,7 +211,8 @@ def logout():
     """
     logout_user()
     return redirect(url_for("user_views.login"))
-    
+
+
 @auth_views.route("/login/api_callback/", methods=["GET"])
 def validate_api_token():
     """Handler for logging in using an authenticated session for the API.
@@ -245,17 +220,6 @@ def validate_api_token():
     Returns:
         A simple page indicating the user is authenticated.
     """
-    current_app.logger.debug(f"Remote addr: {request.remote_addr}")
-    current_app.logger.debug(f"Is local request: {is_local_request()}")
-    if is_local_request():
-        username = request.form.get('username')
-        password = request.form.get('password')
-        user = User.query.filter_by(username=username).first()
-        if user and user.check_password(plaintext=password):
-            login_user(user)
-            return jsonify({"message": "Authenticated successfully"}), 200
-        return jsonify({"error": "Invalid credentials"}), 401
-        
     ALLOWED_CLIENT_IDS = []
 
     try:
