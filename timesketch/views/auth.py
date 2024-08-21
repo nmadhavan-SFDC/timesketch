@@ -90,22 +90,28 @@ def login():
     """
     # Check if it's an API request
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Content-Type') == 'application/json':
-        # Handle API authentication
-        if request.is_json:
-            data = request.get_json()
-            username = data.get('username')
-            password = data.get('password')
-        else:
-            username = request.form.get('username')
-            password = request.form.get('password')
+        return api_login()
+    return web_login()
 
-        user = User.query.filter_by(username=username).first()
-        if user and user.check_password(plaintext=password):
-            login_user(user)
-            return jsonify({"message": "Login successful"}), 200
-        else:
-            return jsonify({"message": "Invalid credentials"}), 401
-            
+def api_login():
+"""Handle API authentication."""
+    if request.is_json:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+    else:
+        username = request.form.get('username')
+        password = request.form.get('password')
+    
+    user = User.query.filter_by(username=username).first()
+    if user and user.check_password(plaintext=password):
+        login_user(user)
+        return jsonify({"message": "Login successful"}), 200
+    else:
+        return jsonify({"message": "Invalid credentials"}), 401
+
+def web_login():
+    """Handle web authentication."""   
     #Generic Oauth
     if current_app.config.get('OAUTH_ENABLED', False):
         redirect_uri = url_for('user_views.oauth2callback', _external=True, _scheme='https')
