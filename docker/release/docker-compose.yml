@@ -44,7 +44,7 @@ services:
     environment:
       - NUM_WSGI_WORKERS=${NUM_WSGI_WORKERS}
     restart: always
-    command: timesketch-web
+    command: timesketch-api
     volumes:
       - ${TIMESKETCH_CONFIG_PATH}:/etc/timesketch/
       - ${TIMESKETCH_UPLOAD_PATH}:/usr/share/timesketch/upload/
