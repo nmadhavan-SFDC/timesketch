@@ -46,9 +46,9 @@ services:
     restart: always
     command: timesketch-api
     volumes:
-      - ${TIMESKETCH_CONFIG_PATH}:/etc/timesketch/
-      - ${TIMESKETCH_UPLOAD_PATH}:/usr/share/timesketch/upload/
-      - ${TIMESKETCH_LOGS_PATH}:/var/log/timesketch/
+      - ./etc/timesketch:/etc/timesketch/
+      - ./upload:/usr/share/timesketch/upload/
+      - ./logs:/var/log/timesketch/
 
   opensearch:
     container_name: opensearch
