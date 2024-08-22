@@ -11,10 +11,6 @@ services:
       - ${TIMESKETCH_CONFIG_PATH}:/etc/timesketch/
       - ${TIMESKETCH_UPLOAD_PATH}:/usr/share/timesketch/upload/
       - ${TIMESKETCH_LOGS_PATH}:/var/log/timesketch/
-    depends_on:
-      - opensearch
-      - postgres
-      - redis
 
   # Temporary service while the V2 UI is in the testing phase.
   # TODO: Remove when V2 is the default.
@@ -29,10 +25,6 @@ services:
       - ./etc/timesketch:/etc/timesketch/
       - ./upload:/usr/share/timesketch/upload/
       - ./logs:/var/log/timesketch/
-    depends_on:
-      - opensearch
-      - postgres
-      - redis
 
   timesketch-worker:
     container_name: timesketch-worker
@@ -45,10 +37,6 @@ services:
       - ${TIMESKETCH_CONFIG_PATH}:/etc/timesketch/
       - ${TIMESKETCH_UPLOAD_PATH}:/usr/share/timesketch/upload/
       - ${TIMESKETCH_LOGS_PATH}:/var/log/timesketch/
-    depends_on:
-      - opensearch
-      - postgres
-      - redis
   
   timesketch-api:
     container_name: timesketch-api
@@ -56,15 +44,24 @@ services:
     environment:
       - NUM_WSGI_WORKERS=${NUM_WSGI_WORKERS}
     restart: always
-    command: timesketch-api
+    entrypoint: []
+    command: >
+      gunicorn
+      --bind 0.0.0.0:5000
+      --log-file /var/log/timesketch/wsgi.log
+      --error-logfile /var/log/timesketch/wsgi_error.log
+      --log-level info
+      --capture-output
+      --timeout 600
+      --limit-request-line 8190
+      --workers ${NUM_WSGI_WORKERS}
+      timesketch.wsgi:application
     volumes:
-      - ./etc/timesketch:/etc/timesketch/
-      - ./upload:/usr/share/timesketch/upload/
-      - ./logs:/var/log/timesketch/
-    depends_on:
-      - opensearch
-      - postgres
-      - redis
+      - ${TIMESKETCH_CONFIG_PATH}:/etc/timesketch/
+      - ${TIMESKETCH_UPLOAD_PATH}:/usr/share/timesketch/upload/
+      - ${TIMESKETCH_LOGS_PATH}:/var/log/timesketch/
+    ports:
+      - "5000:5000"
 
   opensearch:
     container_name: opensearch
