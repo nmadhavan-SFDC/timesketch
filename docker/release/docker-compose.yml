@@ -63,6 +63,23 @@ services:
     ports:
       - "5000:5000"
 
+  timesketch-api-worker:
+    container_name: timesketch-api-worker
+    image: us-docker.pkg.dev/osdfir-registry/timesketch/timesketch:${TIMESKETCH_VERSION}
+    environment:
+      - WORKER_LOG_LEVEL=${WORKER_LOG_LEVEL}
+    restart: always
+    entrypoint: []
+    command: >
+      celery 
+      -A timesketch.lib.tasks worker
+      --logfile=/var/log/timesketch/worker.log \
+      --loglevel="${WORKER_LOG_LEVEL}"
+    volumes:
+      - ${TIMESKETCH_CONFIG_PATH}:/etc/timesketch/
+      - ${TIMESKETCH_UPLOAD_PATH}:/usr/share/timesketch/upload/
+      - ${TIMESKETCH_LOGS_PATH}:/var/log/timesketch/
+
   opensearch:
     container_name: opensearch
     image: opensearchproject/opensearch:${OPENSEARCH_VERSION}
