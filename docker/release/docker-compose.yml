@@ -47,7 +47,7 @@ services:
     entrypoint: []
     command: >
       gunicorn
-      --bind 0.0.0.0:5000
+      --bind 0.0.0.0:5001
       --log-file /var/log/timesketch/wsgi.log
       --error-logfile /var/log/timesketch/wsgi_error.log
       --log-level info
