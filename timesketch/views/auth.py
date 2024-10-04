@@ -16,6 +16,11 @@
 from __future__ import unicode_literals
 
 import requests
+import os
+from urllib.parse import urlparse
+from flask import current_app
+from onelogin.saml2.auth import OneLogin_Saml2_Auth
+
 
 from flask import abort
 from flask import Blueprint
@@ -70,6 +75,20 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
 
+def init_saml_auth(req):
+    auth = OneLogin_Saml2_Auth(req, custom_base_path=os.path.join(current_app.root_path, 'saml'))
+    return auth
+
+def prepare_flask_request(request):
+    url_data = urlparse(request.url)
+    return {
+        'https': 'on' if request.scheme == 'https' else 'off',
+        'http_host': request.host,
+        'script_name': request.path,
+        'server_port': url_data.port or ('443' if request.scheme == 'https' else '80'),
+        'get_data': request.args.copy(),
+        'post_data': request.form.copy()
+    }
 
 @auth_views.route("/login/", methods=["GET", "POST"])
 def login():
@@ -88,6 +107,21 @@ def login():
         Redirect if authentication is successful or template with context
         otherwise.
     """
+    # Check if the user is already authenticated
+    if current_user.is_authenticated:
+        return redirect(request.args.get("next") or "/")
+
+    # SAML Authentication
+    if current_app.config.get("SAML_ENABLED", False):
+        if request.method == 'GET':
+            # Initiate SAML SSO
+            req = prepare_flask_request(request)
+            auth = init_saml_auth(req)
+            return redirect(auth.login())
+        else:
+            # Handle SAML response (ACS endpoint)
+            return acs()
+            
     #Generic Oauth
     if current_app.config.get('OAUTH_ENABLED', False):
         redirect_uri = url_for('user_views.oauth2callback', _external=True, _scheme='https')
@@ -170,15 +204,67 @@ def login():
     form = UsernamePasswordForm()
     if form.validate_on_submit:
         user = User.query.filter_by(username=form.username.data).first()
-        if user:
-            if user.check_password(plaintext=form.password.data):
-                login_user(user)
+        if user and user.check_password(plaintext=form.password.data):
+            login_user(user)
+            return redirect(request.args.get("next") or "/")
 
     # Log the user in and setup the session.
     if current_user.is_authenticated:
         return redirect(request.args.get("next") or "/")
 
     return render_template("login.html", form=form)
+
+@auth_views.route('/saml/acs/', methods=['POST'])
+def acs():
+    req = prepare_flask_request(request)
+    auth = init_saml_auth(req)
+    auth.process_response()
+    errors = auth.get_errors()
+    if not errors:
+        if auth.is_authenticated():
+            session['samlUserdata'] = auth.get_attributes()
+            session['samlNameId'] = auth.get_nameid()
+            session['samlSessionIndex'] = auth.get_session_index()
+            # Extract user information and log in the user
+            username = session['samlNameId']
+            user = User.query.filter_by(username=username).first()
+            if not user:
+                # Optionally create a new user
+                user = User(username=username)
+                db_session.add(user)
+                db_session.commit()
+            login_user(user)
+            return redirect(url_for('home'))
+        else:
+            return 'Not authenticated', 401
+    else:
+        return 'Error processing SAML response: ' + ', '.join(errors), 400
+
+@auth_views.route('/saml/sls/', methods=['GET', 'POST'])
+def sls():
+    req = prepare_flask_request(request)
+    auth = init_saml_auth(req)
+    url = auth.process_slo()
+    errors = auth.get_errors()
+    if len(errors) == 0:
+        session.clear()
+        return redirect(url or url_for('index'))
+    else:
+        return 'Error during SLO: ' + ', '.join(errors), 400
+
+@auth_views.route('/metadata/')
+def metadata():
+    req = prepare_flask_request(request)
+    auth = init_saml_auth(req)
+    settings = auth.get_settings()
+    metadata = settings.get_sp_metadata()
+    errors = settings.validate_metadata(metadata)
+    if len(errors) == 0:
+        resp = make_response(metadata, 200)
+        resp.headers['Content-Type'] = 'text/xml'
+        return resp
+    else:
+        return 'Error in metadata: ' + ', '.join(errors), 500
 
 @auth_views.route('/auth/oauth2callback')
 def oauth2callback():
