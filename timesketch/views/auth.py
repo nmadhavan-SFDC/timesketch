@@ -76,7 +76,7 @@ SCOPES = [
 ]
 
 def init_saml_auth(req):
-    auth = OneLogin_Saml2_Auth(req, custom_base_path=os.path.join(current_app.root_path, 'saml'))
+    auth = OneLogin_Saml2_Auth(req, custom_base_path=current_app.config['SAML_SETTINGS_PATH'])
     return auth
 
 def prepare_flask_request(request):
