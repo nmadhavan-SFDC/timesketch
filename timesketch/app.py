@@ -35,8 +35,6 @@ from timesketch.lib.errors import ApiHTTPError
 from timesketch.models import configure_engine
 from timesketch.models import init_db
 from timesketch.models.user import User
-from timesketch.views.auth import auth_views
-from timesketch.views.spa import spa_views
 
 
 def create_app(config=None, legacy_ui=False):
@@ -139,8 +137,8 @@ def create_app(config=None, legacy_ui=False):
     # Register blueprints. Blueprints are a way to organize your Flask
     # Flask application. See this for more information:
     # http://flask.pocoo.org/docs/latest/blueprints/
-    app.register_blueprint(spa_views)
-    app.register_blueprint(auth_views)
+    #app.register_blueprint(spa_views)
+    #app.register_blueprint(auth_views)
 
     # Setup URL routes for the API.
     api_v1 = Api(app, prefix="/api/v1")
@@ -197,6 +195,10 @@ def create_app(config=None, legacy_ui=False):
 
     # Setup CSRF protection for the whole application
     csrf.init_app(app)
+
+    # Import blueprints here to avoid circular imports
+    from timesketch.views.auth import auth_views
+    from timesketch.views.spa import spa_views
 
     # Register blueprints after initializing extensions
     app.register_blueprint(spa_views)
