@@ -18,7 +18,7 @@ from __future__ import unicode_literals
 import requests
 
 from flask_wtf.csrf import CSRFProtect
-from timesketch.app import csrf
+from timesketch.extensions import csrf
 
 from flask import abort
 from flask import Blueprint
