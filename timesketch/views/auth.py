@@ -54,6 +54,11 @@ from timesketch.models.user import User
 from flask import current_app, redirect, url_for
 from timesketch.views.generic_oauth import setup_oauth, oauth
 
+from onelogin.saml2.auth import OneLogin_Saml2_Auth
+from onelogin.saml2.utils import OneLogin_Saml2_Utils
+from urllib.parse import urlparse
+from flask import make_response
+
 # Register flask blueprint
 auth_views = Blueprint("user_views", __name__)
 oauth_provider = None
@@ -70,7 +75,22 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
 
+def prepare_flask_request(request):
+    url_data = urlparse(request.url)
+    return {
+        'https': 'on' if request.scheme == 'https' else 'off',
+        'http_host': request.host,
+        'server_port': url_data.port or ('443' if request.scheme == 'https' else '80'),
+        'script_name': request.path,
+        'get_data': request.args.copy(),
+        'post_data': request.form.copy(),
+        'query_string': request.query_string.decode('utf-8'),
+    }
 
+def init_saml_auth(req):
+    auth = OneLogin_Saml2_Auth(req, custom_base_path=current_app.config['SAML_PATH'])
+    return auth
+    
 @auth_views.route("/login/", methods=["GET", "POST"])
 def login():
     """Handler for the login page view.
@@ -88,6 +108,13 @@ def login():
         Redirect if authentication is successful or template with context
         otherwise.
     """
+    # SAML authentication
+    if current_app.config.get('SAML_ENABLED', False):
+        req = prepare_flask_request(request)
+        auth = init_saml_auth(req)
+        session['RelayState'] = request.args.get('next', '/')
+        return redirect(auth.login())
+        
     #Generic Oauth
     if current_app.config.get('OAUTH_ENABLED', False):
         redirect_uri = url_for('user_views.oauth2callback', _external=True, _scheme='https')
@@ -179,6 +206,79 @@ def login():
         return redirect(request.args.get("next") or "/")
 
     return render_template("login.html", form=form)
+
+@auth_views.route('/saml/acs', methods=['POST'])
+def saml_acs():
+    req = prepare_flask_request(request)
+    auth = init_saml_auth(req)
+    auth.process_response()
+    errors = auth.get_errors()
+    if errors:
+        current_app.logger.error('SAML ACS errors: {}'.format(', '.join(errors)))
+        return abort(400, 'SAML authentication failed.')
+
+    if not auth.is_authenticated():
+        return abort(401, 'User not authenticated via SAML.')
+
+    attributes = auth.get_attributes()
+    email = auth.get_nameid()
+
+    if email:
+        session['samlNameId'] = auth.get_nameid()
+        session['samlSessionIndex'] = auth.get_session_index()
+
+        user = User.get_or_create(username=email, name=email)
+        login_user(user)
+        return redirect(session.get('RelayState', '/'))
+    else:
+        return abort(400, 'User email not found in SAML response.')
+
+@auth_views.route('/saml/metadata/', methods=['GET'])
+def saml_metadata():
+    req = prepare_flask_request(request)
+    auth = init_saml_auth(req)
+    settings = auth.get_settings()
+    metadata = settings.get_sp_metadata()
+    errors = settings.validate_metadata(metadata)
+    if len(errors) == 0:
+        resp = make_response(metadata, 200)
+        resp.headers['Content-Type'] = 'text/xml'
+        return resp
+    else:
+        return abort(500, 'Errors found in SP metadata: {}'.format(', '.join(errors)))
+
+@auth_views.route('/saml/sls/', methods=['GET', 'POST'])
+def saml_sls():
+    req = prepare_flask_request(request)
+    auth = init_saml_auth(req)
+    dscb = lambda: session.clear()
+    url = auth.process_slo(delete_session_cb=dscb)
+    errors = auth.get_errors()
+    if len(errors) == 0:
+        if url:
+            return redirect(url)
+        else:
+            return redirect(url_for('user_views.login'))
+    else:
+        current_app.logger.error('SAML SLS errors: {}'.format(', '.join(errors)))
+        return abort(400, 'SAML logout failed.')
+
+@auth_views.route("/logout/", methods=["GET"])
+def logout():
+    if current_app.config.get('SAML_ENABLED', False):
+        req = prepare_flask_request(request)
+        auth = init_saml_auth(req)
+        name_id = session.get('samlNameId')
+        session_index = session.get('samlSessionIndex')
+
+        logout_user()
+        session.clear()
+
+        return redirect(auth.logout(name_id=name_id, session_index=session_index))
+    else:
+        # Existing logout logic
+        logout_user()
+        return redirect(url_for("user_views.login"))
 
 @auth_views.route('/auth/oauth2callback')
 def oauth2callback():
