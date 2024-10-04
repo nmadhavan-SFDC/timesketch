@@ -28,7 +28,7 @@ from flask_login import LoginManager
 from flask_login import login_required
 from flask_migrate import Migrate
 from flask_restful import Api
-from flask_wtf import CSRFProtect
+from timesketch.extensions import csrf
 
 from timesketch.api.v1.routes import API_ROUTES as V1_API_ROUTES
 from timesketch.lib.errors import ApiHTTPError
@@ -196,7 +196,11 @@ def create_app(config=None, legacy_ui=False):
         return User.session.get(User, user_id)
 
     # Setup CSRF protection for the whole application
-    csrf = CSRFProtect(app)
+    csrf.init_app(app)
+
+    # Register blueprints after initializing extensions
+    app.register_blueprint(spa_views)
+    app.register_blueprint(auth_views)
 
     return app
 
