@@ -78,38 +78,48 @@ SCOPES = [
 
 def setup_saml(app):
     if not app.config.get('SAML_ENABLED', False):
+        logger.info("SAML is not enabled in the configuration.")
         return None
     
-    saml_settings = {
-        'strict': True,
-        'debug': app.debug,
-        'sp': {
-            'entityId': app.config['SAML_SP_ENTITY_ID'],
-            'assertionConsumerService': {
-                'url': url_for('user_views.saml_acs', _external=True),
-                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'
+    logger.info("Setting up SAML authentication.")
+    try:
+        saml_settings = {
+            'strict': True,
+            'debug': app.debug,
+            'sp': {
+                'entityId': app.config['SAML_SP_ENTITY_ID'],
+                'assertionConsumerService': {
+                    'url': url_for('user_views.saml_acs', _external=True),
+                    'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'
+                },
+                'singleLogoutService': {
+                    'url': url_for('user_views.saml_sls', _external=True),
+                    'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
+                },
+                'x509cert': app.config['SAML_SP_CERT'],
+                'privateKey': app.config['SAML_SP_KEY']
             },
-            'singleLogoutService': {
-                'url': url_for('user_views.saml_sls', _external=True),
-                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
-            },
-            'x509cert': app.config['SAML_SP_CERT'],
-            'privateKey': app.config['SAML_SP_KEY']
-        },
-        'idp': {
-            'entityId': app.config['SAML_IDP_ENTITY_ID'],
-            'singleSignOnService': {
-                'url': app.config['SAML_IDP_SSO_URL'],
-                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
-            },
-            'singleLogoutService': {
-                'url': app.config['SAML_IDP_SLS_URL'],
-                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
-            },
-            'x509cert': app.config['SAML_IDP_CERT']
+            'idp': {
+                'entityId': app.config['SAML_IDP_ENTITY_ID'],
+                'singleSignOnService': {
+                    'url': app.config['SAML_IDP_SSO_URL'],
+                    'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
+                },
+                'singleLogoutService': {
+                    'url': app.config['SAML_IDP_SLS_URL'],
+                    'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
+                },
+                'x509cert': app.config['SAML_IDP_CERT']
+            }
         }
-    }
-    return OneLogin_Saml2_Auth(None, saml_settings)
+        logger.info("SAML settings configured successfully.")
+        return OneLogin_Saml2_Auth(None, saml_settings)
+    except KeyError as e:
+        logger.error(f"Missing SAML configuration key: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Error setting up SAML: {str(e)}")
+        return None
 
 def prepare_flask_request(request):
     url_data = urlparse(request.url)
@@ -141,14 +151,15 @@ def login():
     """
     # Check if the user is already authenticated
     if current_user.is_authenticated:
+        logger.info(f"Already authenticated user accessing login page: {current_user.username}")
         return redirect(request.args.get("next") or "/")
 
-    # SAML Authentication
     if current_app.config.get("SAML_ENABLED", False):
+        logger.info("Redirecting to SAML login.")
         return redirect(url_for('user_views.saml_login'))
             
-    #Generic Oauth
     if current_app.config.get('OAUTH_ENABLED', False):
+        logger.info("Redirecting to OAuth login.")
         redirect_uri = url_for('user_views.oauth2callback', _external=True, _scheme='https')
         return oauth_provider.authorize_redirect(redirect_uri)
         
@@ -237,48 +248,86 @@ def login():
     # Log the user in and setup the session.
     if current_user.is_authenticated:
         return redirect(request.args.get("next") or "/")
-
+        
+    logger.info("Rendering login page for local authentication.")
     return render_template("login.html", form=form)
 
 @auth_views.route('/login/saml/')
 def saml_login():
+    logger.info("Initiating SAML login process.")
     req = prepare_flask_request(request)
     saml_auth.set_parameters(req)
-    return redirect(saml_auth.login())
+    try:
+        auth_url = saml_auth.login()
+        logger.info(f"Redirecting to IdP: {auth_url}")
+        return redirect(auth_url)
+    except Exception as e:
+        logger.error(f"Error during SAML login initiation: {str(e)}")
+        return "Error initiating SAML login", 500
+
 
 @auth_views.route('/saml/acs/', methods=['POST'])
 def saml_acs():
+    logger.info("Processing SAML assertion.")
     req = prepare_flask_request(request)
     saml_auth.set_parameters(req)
-    saml_auth.process_response()
-    errors = saml_auth.get_errors()
-    if not errors:
+    try:
+        saml_auth.process_response()
+        errors = saml_auth.get_errors()
+        if errors:
+            logger.error(f"SAML response errors: {', '.join(errors)}")
+            return 'Error processing SAML response: ' + ', '.join(errors), 400
+        
         if saml_auth.is_authenticated():
+            logger.info("SAML authentication successful.")
             attributes = saml_auth.get_attributes()
             session['samlNameId'] = saml_auth.get_nameid()
             session['samlSessionIndex'] = saml_auth.get_session_index()
             email = attributes.get('email', [None])[0]
             if email:
+                logger.info(f"Authenticated user email: {email}")
                 user = User.get_or_create(username=email, name=email)
                 login_user(user)
+                logger.info("User logged in successfully.")
                 return redirect(url_for('spa_views.overview'))
+            else:
+                logger.warning("No email attribute found in SAML assertion.")
+        else:
+            logger.warning("SAML authentication failed.")
         return 'Not authenticated', 401
-    return 'Error processing SAML response: ' + ', '.join(errors), 400
+    except Exception as e:
+        logger.error(f"Error processing SAML assertion: {str(e)}")
+        return 'Error processing SAML assertion', 500
 
 @auth_views.route('/saml/sls/')
 def saml_sls():
+    logger.info("Initiating SAML logout process.")
     req = prepare_flask_request(request)
     saml_auth.set_parameters(req)
-    return_to = url_for('user_views.login', _external=True)
-    return redirect(saml_auth.logout(return_to=return_to))
+    try:
+        return_to = url_for('user_views.login', _external=True)
+        logout_url = saml_auth.logout(return_to=return_to)
+        logger.info(f"Redirecting to IdP for logout: {logout_url}")
+        return redirect(logout_url)
+    except Exception as e:
+        logger.error(f"Error during SAML logout: {str(e)}")
+        return "Error during SAML logout", 500
 
 @auth_views.route('/saml/metadata/')
 def saml_metadata():
-    metadata = saml_auth.get_settings().get_sp_metadata()
-    errors = saml_auth.get_settings().validate_metadata(metadata)
-    if len(errors) == 0:
-        return metadata, 200, {'Content-Type': 'text/xml'}
-    return 'Error in SAML metadata: ' + ', '.join(errors), 500
+    logger.info("Generating SAML metadata.")
+    try:
+        metadata = saml_auth.get_settings().get_sp_metadata()
+        errors = saml_auth.get_settings().validate_metadata(metadata)
+        if len(errors) == 0:
+            logger.info("SAML metadata generated successfully.")
+            return metadata, 200, {'Content-Type': 'text/xml'}
+        else:
+            logger.error(f"Errors in SAML metadata: {', '.join(errors)}")
+            return 'Error in SAML metadata: ' + ', '.join(errors), 500
+    except Exception as e:
+        logger.error(f"Error generating SAML metadata: {str(e)}")
+        return 'Error generating SAML metadata', 500
 
 @auth_views.route('/auth/oauth2callback')
 def oauth2callback():
