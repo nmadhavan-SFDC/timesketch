@@ -217,8 +217,10 @@ def saml_acs():
     auth = init_saml_auth(req)
     auth.process_response()
     errors = auth.get_errors()
+    error_reason = auth.get_last_error_reason()
     if errors:
         current_app.logger.error('SAML ACS errors: {}'.format(', '.join(errors)))
+        current_app.logger.error('SAML ACS error reason: {}'.format(error_reason))
         return abort(400, 'SAML authentication failed.')
 
     if not auth.is_authenticated():
