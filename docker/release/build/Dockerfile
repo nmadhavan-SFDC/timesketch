@@ -16,6 +16,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gpg-agent \
     wget \
     tzdata \
+    libxml2-dev \
+    libxmlsec1-dev \
+    libxmlsec1-openssl \
+    pkg-config \
+    xmlsec1 \
+    xmlsec1-openssl \
   && rm -rf /var/lib/apt/lists/*
 
 # Install Timesketch
