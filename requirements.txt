@@ -40,6 +40,5 @@ jsonschema==4.17.3
 Authlib
 psycopg2-binary
 python3-saml>=1.14.0
-lxml==4.9.3
 defusedxml==0.7.1
 isodate==0.6.1
