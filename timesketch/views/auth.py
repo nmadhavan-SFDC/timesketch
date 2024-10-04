@@ -302,17 +302,6 @@ def oauth2callback():
         current_app.logger.error(f"Error in oauth2callback: {str(e)}")
         return 'An error occurred during authentication', 500
 
-@auth_views.route("/logout/", methods=["GET"])
-def logout():
-    """Handler for the logout page view.
-
-    Returns:
-        Redirect response.
-    """
-    logout_user()
-    return redirect(url_for("user_views.login"))
-
-
 @auth_views.route("/login/api_callback/", methods=["GET"])
 def validate_api_token():
     """Handler for logging in using an authenticated session for the API.
