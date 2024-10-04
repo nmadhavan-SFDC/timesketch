@@ -17,7 +17,7 @@ from __future__ import unicode_literals
 
 import requests
 
-from flask_wtf.csrf import CSRFProtect, csrf_exempt
+from flask_wtf.csrf import CSRFProtect
 
 from flask import abort
 from flask import Blueprint
@@ -210,7 +210,7 @@ def login():
     return render_template("login.html", form=form)
 
 @auth_views.route('/saml/acs/', methods=['POST'])
-@csrf_exempt
+@csrf.exempt
 def saml_acs():
     req = prepare_flask_request(request)
     auth = init_saml_auth(req)
