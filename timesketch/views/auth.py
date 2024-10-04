@@ -17,6 +17,7 @@ from __future__ import unicode_literals
 
 import requests
 import os
+import logging
 from urllib.parse import urlparse
 from flask import current_app
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
@@ -76,6 +77,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
 
+logger = logging.getLogger(__name__)
 def setup_saml(app):
     if not app.config.get('SAML_ENABLED', False):
         logger.info("SAML is not enabled in the configuration.")
