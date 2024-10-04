@@ -1,0 +1,30 @@
+{
+  "strict": true,
+  "debug": true,
+  "sp": {
+    "entityId": "https://your-timesketch-domain.com/metadata/",
+    "assertionConsumerService": {
+      "url": "https://your-timesketch-domain.com/saml/acs/",
+      "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+    },
+    "singleLogoutService": {
+      "url": "https://your-timesketch-domain.com/saml/sls/",
+      "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+    },
+    "NameIDFormat": "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+    "x509cert": "",
+    "privateKey": ""
+  },
+  "idp": {
+    "entityId": "https://your-idp.com/metadata",
+    "singleSignOnService": {
+      "url": "https://your-idp.com/sso",
+      "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+    },
+    "singleLogoutService": {
+      "url": "https://your-idp.com/slo",
+      "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+    },
+    "x509cert": ""
+  }
+}
