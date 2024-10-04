@@ -18,10 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     libxml2-dev \
     libxmlsec1-dev \
-    libxmlsec1-openssl \
     pkg-config \
     xmlsec1 \
-    xmlsec1-openssl \
+    libssl-dev \
+    openssl \
   && rm -rf /var/lib/apt/lists/*
 
 # Install Timesketch
