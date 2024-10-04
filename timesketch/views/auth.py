@@ -80,47 +80,47 @@ SCOPES = [
 logger = logging.getLogger(__name__)
 saml_auth = None
 
-def init_saml():
+def init_saml(app):
     global saml_auth
-    if current_app.config.get('SAML_ENABLED', False):
+    if saml_auth is not None:
+        return  # SAML already initialized
+
+    if app.config.get('SAML_ENABLED', False):
         try:
             saml_settings = {
                 'strict': True,
-                'debug': current_app.debug,
+                'debug': app.debug,
                 'sp': {
-                    'entityId': current_app.config['SAML_SP_ENTITY_ID'],
+                    'entityId': app.config['SAML_SP_ENTITY_ID'],
                     'assertionConsumerService': {
-                        'url': url_for('user_views.saml_acs', _external=True),
+                        'url': app.config['SAML_SP_ACS_URL'],
                         'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'
                     },
                     'singleLogoutService': {
-                        'url': url_for('user_views.saml_sls', _external=True),
+                        'url': app.config['SAML_SP_SLS_URL'],
                         'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
                     },
-                    'x509cert': current_app.config['SAML_SP_CERT'],
-                    'privateKey': current_app.config['SAML_SP_KEY']
+                    'x509cert': app.config['SAML_SP_CERT'],
+                    'privateKey': app.config['SAML_SP_KEY']
                 },
                 'idp': {
-                    'entityId': current_app.config['SAML_IDP_ENTITY_ID'],
+                    'entityId': app.config['SAML_IDP_ENTITY_ID'],
                     'singleSignOnService': {
-                        'url': current_app.config['SAML_IDP_SSO_URL'],
+                        'url': app.config['SAML_IDP_SSO_URL'],
                         'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
                     },
                     'singleLogoutService': {
-                        'url': current_app.config['SAML_IDP_SLS_URL'],
+                        'url': app.config['SAML_IDP_SLS_URL'],
                         'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
                     },
-                    'x509cert': current_app.config['SAML_IDP_CERT']
+                    'x509cert': app.config['SAML_IDP_CERT']
                 }
             }
             saml_auth = OneLogin_Saml2_Auth(None, saml_settings)
-            current_app.logger.info("SAML authentication set up successfully.")
+            app.logger.info("SAML authentication set up successfully.")
         except Exception as e:
-            current_app.logger.error(f"Error setting up SAML: {str(e)}")
+            app.logger.error(f"Error setting up SAML: {str(e)}")
 
-@auth_views.before_app_first_request
-def setup_saml():
-    init_saml()
     
 def prepare_flask_request(request):
     url_data = urlparse(request.url)
@@ -255,7 +255,6 @@ def login():
 
 @auth_views.route('/login/saml/')
 def saml_login():
-    global saml_auth
     if saml_auth is None:
         current_app.logger.error("SAML authentication not initialized.")
         return "SAML authentication not set up", 500
