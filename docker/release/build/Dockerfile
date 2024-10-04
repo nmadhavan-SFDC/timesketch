@@ -23,12 +23,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     openssl \
   && rm -rf /var/lib/apt/lists/*
+  
+# Install compatible versions of lxml and xmlsec
+RUN pip install lxml==4.6.5 xmlsec==1.3.13
 
 # Install Timesketch
 RUN wget https://raw.githubusercontent.com/nmadhavan-sfdc/timesketch/master/requirements.txt
 
-# Install a compatible version of lxml
-RUN pip3 install "lxml<4.7.1"
+RUN sed -i '/^lxml==/d' requirements.txt && \
+    sed -i '/^xmlsec==/d' requirements.txt
 
 RUN pip3 install -r requirements.txt
 RUN pip3 install https://github.com/nmadhavan-sfdc/timesketch/archive/master.zip
