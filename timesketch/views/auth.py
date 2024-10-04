@@ -65,8 +65,9 @@ oauth_provider = None
 
 @auth_views.record_once
 def on_load(state):
-    global oauth_provider
+    global oauth_provider, saml_auth
     oauth_provider = setup_oauth(state.app)
+    saml_auth = setup_saml(state.app)
 
 TOKEN_URI = "https://www.googleapis.com/oauth2/v3/tokeninfo"
 SCOPES = [
@@ -75,9 +76,40 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
 
-def init_saml_auth(req):
-    auth = OneLogin_Saml2_Auth(req, custom_base_path=current_app.config['SAML_SETTINGS_PATH'])
-    return auth
+def setup_saml(app):
+    if not app.config.get('SAML_ENABLED', False):
+        return None
+    
+    saml_settings = {
+        'strict': True,
+        'debug': app.debug,
+        'sp': {
+            'entityId': app.config['SAML_SP_ENTITY_ID'],
+            'assertionConsumerService': {
+                'url': url_for('user_views.saml_acs', _external=True),
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'
+            },
+            'singleLogoutService': {
+                'url': url_for('user_views.saml_sls', _external=True),
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
+            },
+            'x509cert': app.config['SAML_SP_CERT'],
+            'privateKey': app.config['SAML_SP_KEY']
+        },
+        'idp': {
+            'entityId': app.config['SAML_IDP_ENTITY_ID'],
+            'singleSignOnService': {
+                'url': app.config['SAML_IDP_SSO_URL'],
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
+            },
+            'singleLogoutService': {
+                'url': app.config['SAML_IDP_SLS_URL'],
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
+            },
+            'x509cert': app.config['SAML_IDP_CERT']
+        }
+    }
+    return OneLogin_Saml2_Auth(None, saml_settings)
 
 def prepare_flask_request(request):
     url_data = urlparse(request.url)
@@ -113,19 +145,13 @@ def login():
 
     # SAML Authentication
     if current_app.config.get("SAML_ENABLED", False):
-        if request.method == 'GET':
-            # Initiate SAML SSO
-            req = prepare_flask_request(request)
-            auth = init_saml_auth(req)
-            return redirect(auth.login())
-        else:
-            # Handle SAML response (ACS endpoint)
-            return acs()
+        return redirect(url_for('user_views.saml_login'))
             
     #Generic Oauth
     if current_app.config.get('OAUTH_ENABLED', False):
         redirect_uri = url_for('user_views.oauth2callback', _external=True, _scheme='https')
         return oauth_provider.authorize_redirect(redirect_uri)
+        
     # Google OpenID Connect authentication.
     if current_app.config.get("GOOGLE_OIDC_ENABLED", False):
         hosted_domain = current_app.config.get("GOOGLE_OIDC_HOSTED_DOMAIN")
@@ -214,57 +240,45 @@ def login():
 
     return render_template("login.html", form=form)
 
+@auth_views.route('/login/saml/')
+def saml_login():
+    req = prepare_flask_request(request)
+    saml_auth.set_parameters(req)
+    return redirect(saml_auth.login())
+
 @auth_views.route('/saml/acs/', methods=['POST'])
-def acs():
+def saml_acs():
     req = prepare_flask_request(request)
-    auth = init_saml_auth(req)
-    auth.process_response()
-    errors = auth.get_errors()
+    saml_auth.set_parameters(req)
+    saml_auth.process_response()
+    errors = saml_auth.get_errors()
     if not errors:
-        if auth.is_authenticated():
-            session['samlUserdata'] = auth.get_attributes()
-            session['samlNameId'] = auth.get_nameid()
-            session['samlSessionIndex'] = auth.get_session_index()
-            # Extract user information and log in the user
-            username = session['samlNameId']
-            user = User.query.filter_by(username=username).first()
-            if not user:
-                # Optionally create a new user
-                user = User(username=username)
-                db_session.add(user)
-                db_session.commit()
-            login_user(user)
-            return redirect(url_for('home'))
-        else:
-            return 'Not authenticated', 401
-    else:
-        return 'Error processing SAML response: ' + ', '.join(errors), 400
+        if saml_auth.is_authenticated():
+            attributes = saml_auth.get_attributes()
+            session['samlNameId'] = saml_auth.get_nameid()
+            session['samlSessionIndex'] = saml_auth.get_session_index()
+            email = attributes.get('email', [None])[0]
+            if email:
+                user = User.get_or_create(username=email, name=email)
+                login_user(user)
+                return redirect(url_for('spa_views.overview'))
+        return 'Not authenticated', 401
+    return 'Error processing SAML response: ' + ', '.join(errors), 400
 
-@auth_views.route('/saml/sls/', methods=['GET', 'POST'])
-def sls():
+@auth_views.route('/saml/sls/')
+def saml_sls():
     req = prepare_flask_request(request)
-    auth = init_saml_auth(req)
-    url = auth.process_slo()
-    errors = auth.get_errors()
-    if len(errors) == 0:
-        session.clear()
-        return redirect(url or url_for('index'))
-    else:
-        return 'Error during SLO: ' + ', '.join(errors), 400
+    saml_auth.set_parameters(req)
+    return_to = url_for('user_views.login', _external=True)
+    return redirect(saml_auth.logout(return_to=return_to))
 
-@auth_views.route('/metadata/')
-def metadata():
-    req = prepare_flask_request(request)
-    auth = init_saml_auth(req)
-    settings = auth.get_settings()
-    metadata = settings.get_sp_metadata()
-    errors = settings.validate_metadata(metadata)
+@auth_views.route('/saml/metadata/')
+def saml_metadata():
+    metadata = saml_auth.get_settings().get_sp_metadata()
+    errors = saml_auth.get_settings().validate_metadata(metadata)
     if len(errors) == 0:
-        resp = make_response(metadata, 200)
-        resp.headers['Content-Type'] = 'text/xml'
-        return resp
-    else:
-        return 'Error in metadata: ' + ', '.join(errors), 500
+        return metadata, 200, {'Content-Type': 'text/xml'}
+    return 'Error in SAML metadata: ' + ', '.join(errors), 500
 
 @auth_views.route('/auth/oauth2callback')
 def oauth2callback():
