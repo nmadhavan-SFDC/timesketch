@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN wget https://raw.githubusercontent.com/nmadhavan-sfdc/timesketch/master/requirements.txt
 
 # Install a compatible version of lxml
-RUN pip3 install lxml==4.7.0
+RUN pip3 install "lxml<4.7.1"
 
 RUN pip3 install -r requirements.txt
 RUN pip3 install https://github.com/nmadhavan-sfdc/timesketch/archive/master.zip
