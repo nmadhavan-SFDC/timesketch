@@ -207,7 +207,7 @@ def login():
 
     return render_template("login.html", form=form)
 
-@auth_views.route('/saml/acs', methods=['POST'])
+@auth_views.route('/saml/acs/', methods=['POST'])
 def saml_acs():
     req = prepare_flask_request(request)
     auth = init_saml_auth(req)
