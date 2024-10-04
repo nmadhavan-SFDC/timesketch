@@ -196,7 +196,7 @@ def create_app(config=None, legacy_ui=False):
         return User.session.get(User, user_id)
 
     # Setup CSRF protection for the whole application
-    CSRFProtect(app)
+    csrf = CSRFProtect(app)
 
     return app
 
