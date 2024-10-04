@@ -27,37 +27,13 @@ def create_app(config=None):
     logger = logging.getLogger(__name__)
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
+
     logger.info("Starting to create Flask application...")
 
     try:
-        # Create Flask app
-        flask_app = Flask(__name__)
-
-        # Load configuration from timesketch.conf
-        load_config(flask_app)
-
-        # Override with environment variables (optional)
-        flask_app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', flask_app.config.get('SECRET_KEY', 'default-secret-key'))
-        flask_app.config['DEBUG'] = os.environ.get('DEBUG', flask_app.config.get('DEBUG', 'False')).lower() == 'true'
-
-        # If a config dictionary is passed, update the app config with it
-        if config:
-            flask_app.config.update(config)
-
-        # Initialize SAML within app context
-        with flask_app.app_context():
-            init_saml(flask_app)
-
-        # Register blueprints
-        flask_app.register_blueprint(auth_views)
-
+        flask_app = app.create_app(config)
         logger.info("Flask application created successfully.")
         return flask_app
     except Exception as e:
         logger.error("Failed to create Flask application.", exc_info=True)
         raise e
-
-# This allows you to run the app directly with `python __init__.py`
-if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True)
