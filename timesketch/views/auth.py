@@ -221,36 +221,35 @@ def saml_acs():
     auth = init_saml_auth(req)
     try:
         auth.process_response()
-    except OneLogin_Saml2_ValidationError as e:
-        if 'duplicated Name' in str(e):
-            current_app.logger.warning("Duplicate SAML attribute detected and ignored.")
-        else:
-            raise e
-    errors = auth.get_errors()
-    error_reason = auth.get_last_error_reason()
-    if errors:
-        current_app.logger.error('SAML ACS errors: {}'.format(', '.join(errors)))
-        current_app.logger.error('SAML ACS error reason: {}'.format(error_reason))
-        current_app.logger.debug('Request scheme: {}'.format(request.scheme))
-        current_app.logger.debug('Request URL: {}'.format(request.url))
-        return abort(400, 'SAML authentication failed.')
+        errors = auth.get_errors()
+        if errors:
+            current_app.logger.error('SAML ACS errors: {}'.format(', '.join(errors)))
+            current_app.logger.error('SAML ACS error reason: {}'.format(auth.get_last_error_reason()))
+            return abort(400, 'SAML authentication failed: {}'.format(', '.join(errors)))
 
-    if not auth.is_authenticated():
-        return abort(401, 'User not authenticated via SAML.')
+        if not auth.is_authenticated():
+            return abort(401, 'User not authenticated via SAML.')
 
-    attributes = auth.get_attributes()
-    current_app.logger.debug(f"SAML Attributes: {attributes}")
-    email = auth.get_nameid()
+        nameid = auth.get_nameid()
+        current_app.logger.debug('SAML NameID received: {}'.format(nameid))
 
-    if email:
-        session['samlNameId'] = auth.get_nameid()
+        if not nameid:
+            current_app.logger.error('NameID not found in SAML response')
+            return abort(400, 'NameID not found in SAML response.')
+
+        session['samlNameId'] = nameid
         session['samlSessionIndex'] = auth.get_session_index()
 
-        user = User.get_or_create(username=email, name=email)
+        user = User.get_or_create(username=nameid, name=nameid)
         login_user(user)
         return redirect(session.get('RelayState', '/'))
-    else:
-        return abort(400, 'User email not found in SAML response.')
+
+    except OneLogin_Saml2_ValidationError as e:
+        current_app.logger.error('SAML Validation Error: {}'.format(str(e)))
+        return abort(400, 'SAML Validation Error: {}'.format(str(e)))
+    except Exception as e:
+        current_app.logger.error('Unexpected error in SAML ACS: {}'.format(str(e)))
+        return abort(500, 'An unexpected error occurred during SAML authentication')
 
 @auth_views.route('/saml/metadata/', methods=['GET'])
 def saml_metadata():
