@@ -63,7 +63,7 @@ def create_app(config=None, legacy_ui=False):
     app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
     
     # Apply the ProxyFix middleware
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=2, x_host=2)
 
     # Apply Flask-Talisman to enforce HTTPS and set security headers
     Talisman(app, content_security_policy=None, force_https=True)
