@@ -217,7 +217,13 @@ def login():
 def saml_acs():
     req = prepare_flask_request(request)
     auth = init_saml_auth(req)
-    auth.process_response()
+    try:
+        auth.process_response()
+    except OneLogin_Saml2_ValidationError as e:
+        if 'duplicated Name' in str(e):
+            current_app.logger.warning("Duplicate SAML attribute detected and ignored.")
+        else:
+            raise e
     errors = auth.get_errors()
     error_reason = auth.get_last_error_reason()
     if errors:
@@ -231,6 +237,7 @@ def saml_acs():
         return abort(401, 'User not authenticated via SAML.')
 
     attributes = auth.get_attributes()
+    current_app.logger.debug(f"SAML Attributes: {attributes}")
     email = auth.get_nameid()
 
     if email:
