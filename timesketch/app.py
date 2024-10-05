@@ -65,11 +65,8 @@ def create_app(config=None, legacy_ui=False):
     # Apply the ProxyFix middleware
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=2, x_host=2)
 
-    EXEMPT_VIEW_PATHS = [
-    'api/v1',  # Adjust based on your API path prefix
-]
     # Apply Flask-Talisman to enforce HTTPS and set security headers
-    Talisman(app, content_security_policy=None, force_https=True, exempt_view_paths=EXEMPT_VIEW_PATHS)
+    Talisman(app, content_security_policy=None, force_https=True)
 
     if not config:
         # Where to find the config file
