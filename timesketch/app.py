@@ -28,6 +28,8 @@ from flask_login import LoginManager
 from flask_login import login_required
 from flask_migrate import Migrate
 from flask_restful import Api
+from flask_talisman import Talisman
+
 from timesketch.extensions import csrf
 
 from timesketch.api.v1.routes import API_ROUTES as V1_API_ROUTES
@@ -58,6 +60,9 @@ def create_app(config=None, legacy_ui=False):
         static_folder = "frontend/dist"
 
     app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
+
+    # Apply Flask-Talisman to enforce HTTPS and set security headers
+    Talisman(app, content_security_policy=None, force_https=True)
 
     if not config:
         # Where to find the config file
