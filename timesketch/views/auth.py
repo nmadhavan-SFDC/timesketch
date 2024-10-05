@@ -81,7 +81,7 @@ SCOPES = [
 def prepare_flask_request(request):
     url_data = urlparse(request.url)
     return {
-        'https': 'on' if request.scheme == 'https' else 'off',
+        'https': 'on',
         'http_host': request.host,
         'server_port': url_data.port or ('443' if request.scheme == 'https' else '80'),
         'script_name': request.path,
@@ -91,6 +91,8 @@ def prepare_flask_request(request):
     }
 
 def init_saml_auth(req):
+    req['server_port'] = '443'
+    req['https'] = 'on'
     auth = OneLogin_Saml2_Auth(req, custom_base_path=current_app.config['SAML_PATH'])
     return auth
     
@@ -221,6 +223,8 @@ def saml_acs():
     if errors:
         current_app.logger.error('SAML ACS errors: {}'.format(', '.join(errors)))
         current_app.logger.error('SAML ACS error reason: {}'.format(error_reason))
+        current_app.logger.debug('Request scheme: {}'.format(request.scheme))
+        current_app.logger.debug('Request URL: {}'.format(request.url))
         return abort(400, 'SAML authentication failed.')
 
     if not auth.is_authenticated():
