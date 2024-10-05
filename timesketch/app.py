@@ -29,6 +29,7 @@ from flask_login import login_required
 from flask_migrate import Migrate
 from flask_restful import Api
 from flask_talisman import Talisman
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from timesketch.extensions import csrf
 
@@ -58,8 +59,11 @@ def create_app(config=None, legacy_ui=False):
     if legacy_ui:
         template_folder = "frontend/dist"
         static_folder = "frontend/dist"
-
+    
     app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
+    
+    # Apply the ProxyFix middleware
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
     # Apply Flask-Talisman to enforce HTTPS and set security headers
     Talisman(app, content_security_policy=None, force_https=True)
@@ -150,6 +154,11 @@ def create_app(config=None, legacy_ui=False):
     for route in V1_API_ROUTES:
         api_v1.add_resource(*route)
 
+
+    @app.route('/headers')
+    def headers():
+        return dict(request.headers)
+        
     # Returns 404 for invalid api routes
     # pylint: disable=unused-variable
     @app.route("/api/v1/<path:path>")
