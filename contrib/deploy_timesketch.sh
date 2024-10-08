@@ -16,16 +16,10 @@
 set -e
 
 START_CONTAINER=
-SKIP_CREATE_USER=
 
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        --start-container) START_CONTAINER=yes ;;
-        --skip-create-user) SKIP_CREATE_USER=yes ;;
-        *) echo "Unknown parameter passed: $1"; exit 1 ;;
-    esac
-    shift
-done
+if [ "$1" == "--start-container" ]; then
+    START_CONTAINER=yes
+fi
 
 # Exit early if run as non-root user.
 if [ "$EUID" -ne 0 ]; then
@@ -81,7 +75,7 @@ OPENSEARCH_PORT=9200
 OPENSEARCH_MEM_USE_GB=$(cat /proc/meminfo | grep MemTotal | awk '{printf "%.0f", ($2 / (1024 * 1024) / 2)}')
 REDIS_ADDRESS="redis"
 REDIS_PORT=6379
-GITHUB_BASE_URL="https://raw.githubusercontent.com/nmadhavan-SFDC/timesketch/master"
+GITHUB_BASE_URL="https://raw.githubusercontent.com/google/timesketch/master"
 echo "OK"
 echo "* Setting OpenSearch memory allocation to ${OPENSEARCH_MEM_USE_GB}GB"
 
@@ -156,9 +150,7 @@ else
   exit
 fi
 
-if [ -z "$SKIP_CREATE_USER" ]; then
-  read -p "Would you like to create a new timesketch user? [y/N]" CREATE_USER
-fi
+read -p "Would you like to create a new timesketch user? [Y/n] (default:no)" CREATE_USER
 
 if [ "$CREATE_USER" != "${CREATE_USER#[Yy]}" ] ;then
   read -p "Please provide a new username: " NEWUSERNAME
