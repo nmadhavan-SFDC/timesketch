@@ -28,7 +28,6 @@ from opensearchpy import OpenSearch
 from opensearchpy.exceptions import ConnectionTimeout
 from opensearchpy.exceptions import NotFoundError
 from opensearchpy.exceptions import RequestError
-
 # pylint: disable=redefined-builtin
 from opensearchpy.exceptions import ConnectionError
 
