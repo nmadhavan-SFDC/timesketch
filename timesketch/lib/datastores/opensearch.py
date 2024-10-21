@@ -39,6 +39,9 @@ import prometheus_client
 from timesketch.lib.definitions import HTTP_STATUS_CODE_NOT_FOUND
 from timesketch.lib.definitions import METRICS_NAMESPACE
 
+import boto3
+from requests_aws4auth import AWS4Auth
+from opensearchpy import RequestsHttpConnection
 
 # Setup logging
 es_logger = logging.getLogger("timesketch.opensearch")
@@ -112,25 +115,47 @@ class OpenSearchDataStore(object):
         """Create a OpenSearch client."""
         super().__init__()
         self._error_container = {}
-
-        self.user = current_app.config.get("OPENSEARCH_USER", "user")
-        self.password = current_app.config.get("OPENSEARCH_PASSWORD", "pass")
-        self.ssl = current_app.config.get("OPENSEARCH_SSL", False)
+        
+        self.user = current_app.config.get("OPENSEARCH_USER", None)
+        self.password = current_app.config.get("OPENSEARCH_PASSWORD", None)
+        self.ssl = current_app.config.get("OPENSEARCH_SSL", True)
         self.verify = current_app.config.get("OPENSEARCH_VERIFY_CERTS", True)
-        self.timeout = current_app.config.get("OPENSEARCH_TIMEOUT", 10)
+        self.timeout = current_app.config.get("OPENSEARCH_TIMEOUT", 30)
+        self.aws_auth = current_app.config.get("OPENSEARCH_AWS_AUTH", True)
+        self.aws_region = current_app.config.get("OPENSEARCH_AWS_REGION", "us-west-2")
+        self.aws_service = current_app.config.get("OPENSEARCH_AWS_SERVICE", "es")
+        self.aws_host = current_app.config.get("OPENSEARCH_HOST", host)
 
         parameters = {}
         if self.ssl:
             parameters["use_ssl"] = self.ssl
             parameters["verify_certs"] = self.verify
 
-        if self.user and self.password:
-            parameters["http_auth"] = (self.user, self.password)
         if self.timeout:
             parameters["timeout"] = self.timeout
 
-        self.client = OpenSearch([{"host": host, "port": port}], **parameters)
-
+        if self.aws_auth:
+            # Use AWS4Auth for authentication
+            session = boto3.Session()
+            credentials = session.get_credentials()
+            awsauth = AWS4Auth(
+                credentials.access_key,
+                credentials.secret_key,
+                self.aws_region,
+                self.aws_service,
+                session_token=credentials.token,
+            )
+            parameters["http_auth"] = awsauth
+            parameters["connection_class"] = RequestsHttpConnection
+            # AWS OpenSearch uses HTTPS on port 443
+            self.client = OpenSearch(
+                [{"host": self.aws_host, "port": 443}], **parameters
+            )
+        else:
+            if self.user and self.password:
+                parameters["http_auth"] = (self.user, self.password)
+            self.client = OpenSearch([{"host": host, "port": port}], **parameters)
+    
         # Number of events to queue up when bulk inserting events.
         self.flush_interval = current_app.config.get(
             "OPENSEARCH_FLUSH_INTERVAL", self.DEFAULT_FLUSH_INTERVAL
